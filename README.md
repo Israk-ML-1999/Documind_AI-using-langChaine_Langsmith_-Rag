@@ -23,10 +23,11 @@
    - [Containerization & Fault Isolation](#4-containerization--fault-isolation)
    - [Database Strategy & Schema Evolution](#5-database-strategy--schema-evolution)
    - [Observability & Real-time RAG Evaluation](#6-observability--real-time-rag-evaluation)
-3. [Quick Start (Docker Compose)](#-quick-start-docker-compose)
-4. [Environment Configuration](#-environment-configuration)
-5. [Local Development (Without Docker)](#-local-development-without-docker)
-6. [API Endpoints Overview](#-api-endpoints-overview)
+3. [How to Run with Docker (Step-by-Step Guide)](#-how-to-run-with-docker-step-by-step-guide)
+4. [Docker Management & Useful Commands](#-docker-management--useful-commands)
+5. [Environment Configuration](#-environment-configuration)
+6. [Local Development (Without Docker)](#-local-development-without-docker)
+7. [API Endpoints Overview](#-api-endpoints-overview)
 
 ---
 
@@ -131,37 +132,143 @@ DocuMind integrates **LangSmith** natively with LangChain for full-lifecycle LLM
 
 ---
 
-## 🚀 Quick Start (Docker Compose)
+## 🐳 How to Run with Docker (Step-by-Step Guide)
 
-### 1. Clone the repository
+Running DocuMind AI with Docker is the recommended, production-standard approach. It builds and launches all 6 interconnected services (Frontend, Backend, Redis, Celery Worker, PostgreSQL, and PgAdmin) with zero manual environment configuration.
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+- Ensure Docker has at least 4 GB of RAM allocated (recommended for local vector embeddings and deep neural processing).
+
+---
+
+### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/your-username/documind.git
-cd documind
+git clone https://github.com/Israk-ML-1999/Documind_AI-using-langChaine_Langsmith_-Rag.git
+cd Documind_AI-using-langChaine_Langsmith_-Rag
 ```
 
-### 2. Set Up Environment Variables
-Create your `.env` file from the provided template:
+---
+
+### Step 2: Configure Environment Variables
+Create your local `.env` configuration file from the provided template:
+
 ```bash
+# On Linux / macOS / Git Bash:
 cp .env.example .env
-```
-Open `.env` in any text editor and provide your keys (see [Environment Configuration](#-environment-configuration) below).
 
-### 3. Launch the Platform
+# On Windows PowerShell:
+copy .env.example .env
+```
+
+Open `.env` in any text editor and supply your **Google Gemini API Key** and JWT Secret:
+```env
+# Mandatory: Your free Gemini key from https://aistudio.google.com/
+GOOGLE_API_KEY=AIzaSyYourActualKeyHere
+
+# Mandatory: 32-character secret for token encryption
+SECRET_KEY=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
+
+# Optional: LangSmith API key from https://smith.langchain.com/
+LANGCHAIN_API_KEY=lsv2_pt_your_langsmith_key_here
+```
+
+---
+
+### Step 3: Build & Start All Containers
+Run the Docker Compose build command:
+
 ```bash
 docker compose up --build -d
 ```
 
-### 4. Verify Services
-| Service | URL | Default Credentials |
-|---|---|---|
-| **Web Application** | [http://localhost:3000](http://localhost:3000) | Register any account |
-| **FastAPI Swagger Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | Use Bearer Token |
-| **PgAdmin (DB Console)** | [http://localhost:5050](http://localhost:5050) | `admin@documind.com` / `admin` |
+> **What this command does**:
+> - `--build`: Compiles the Next.js production frontend and builds the Python 3.11 FastAPI image with all machine learning dependencies.
+> - `-d` (Detached mode): Runs all 6 containers cleanly in the background so your terminal remains free.
 
-To monitor live container logs:
+---
+
+### Step 4: Verify Running Services
+Check that all 6 containers are healthy and running:
 ```bash
-docker compose logs -f backend worker
+docker compose ps
 ```
+
+You should see all containers listed with `State: Up` or `healthy`:
+```text
+NAME                IMAGE               STATUS                    PORTS
+documind_frontend   documind-frontend   Up                        0.0.0.0:3000->3000/tcp
+documind_backend    documind-backend    Up                        0.0.0.0:8000->8000/tcp
+documind_worker     documind-backend    Up                        
+documind_redis      redis:7-alpine      Up (healthy)              0.0.0.0:6379->6379/tcp
+documind_db         postgres:15         Up (healthy)              0.0.0.0:5432->5432/tcp
+documind_pgadmin    dpage/pgadmin4      Up                        0.0.0.0:5050->80/tcp
+```
+
+---
+
+### Step 5: Access the Web App & Interactive Docs
+
+| Service | Access URL | Credentials / Notes |
+|---|---|---|
+| 🌐 **Frontend Application** | [http://localhost:3000](http://localhost:3000) | Register any email and password to begin |
+| ⚡ **FastAPI Swagger Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | Interactive testing with Bearer Token |
+| 🗄️ **PgAdmin Database UI** | [http://localhost:5050](http://localhost:5050) | Email: `admin@documind.com` \| Pass: `admin` |
+| 📊 **LangSmith Dashboard** | [https://smith.langchain.com](https://smith.langchain.com) | Live token & cost observability |
+
+---
+
+## 🛠 Docker Management & Useful Commands
+
+### 1. View Live Logs
+To monitor logs in real-time (ideal for viewing RAG evaluation reports and Celery background parsing):
+```bash
+# Stream logs from all containers:
+docker compose logs -f
+
+# Stream only Backend & Celery Worker logs:
+docker compose logs -f backend worker
+
+# Stream only Frontend logs:
+docker compose logs -f frontend
+```
+
+### 2. Restart Containers After Modifying `.env`
+Whenever you edit your `.env` file (e.g. adding a new LangSmith API Key), apply the changes without rebuilding:
+```bash
+docker compose up -d
+```
+
+### 3. Restart a Single Container
+```bash
+# Restart only the backend:
+docker compose restart backend
+
+# Restart only the background Celery worker:
+docker compose restart worker
+```
+
+### 4. Stop the Platform
+```bash
+# Stops all containers safely preserving all database & vector data:
+docker compose down
+```
+
+### 5. Complete Reset / Clean Wipe (Optional)
+If you ever want to completely reset all uploaded documents, database tables, and vector stores:
+```bash
+docker compose down -v
+```
+*(Warning: `-v` deletes the named Docker volumes `postgres_data`, `redis_data`, `chroma_data`, and `uploads_data`).*
+
+---
+
+## 🔧 Docker Troubleshooting
+
+* **Port 5432 / 8000 already in use**:
+  If you have a local PostgreSQL or another web server running on port 5432 or 8000 on your host machine, stop the local service before running `docker compose up -d`.
+* **Celery Worker Architecture Note**:
+  The Celery worker runs with `--pool=threads --concurrency=2` inside Docker. This ensures thread-safe compatibility with ONNX Runtime and ChromaDB without segmentation faults.
 
 ---
 
